@@ -1,6 +1,9 @@
 (ns oauth.one-test
   (:require [clojure.test :refer :all]
-            [oauth.one :refer :all]))
+            [oauth.one :refer :all]
+            [schema.test :refer [validate-schemas]]))
+
+(use-fixtures :once validate-schemas)
 
 (deftest t-auth-headers->str
   (are [m s] (= (auth-headers->str m) s)
