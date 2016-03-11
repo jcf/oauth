@@ -74,6 +74,34 @@
                  (codec/url-encode secret)
                  (codec/url-encode token-secret))))))))
 
+(s/defn ^:private base-string :- s/Str
+  "http://oauth.net/core/1.0/#anchor14
+
+   The Signature Base String is a consistent reproducible concatenation of the
+   request elements into a single string. The string is used as an input in
+   hashing or signing algorithms. The HMAC-SHA1 signature method provides both a
+   standard and an example of using the Signature Base String with a signing
+   algorithm to generate signatures. All the request parameters MUST be encoded
+   as described in Parameter Encoding prior to constructing the Signature Base
+   String.
+
+   The following items MUST be concatenated in order into a single string. Each
+   item is encoded and separated by an ‘&’ character (ASCII code 38), even if
+   empty.
+
+   1. The HTTP request method used to send the request. Value MUST be uppercase,
+      for example: `HEAD`, `GET`, `POST`, etc.
+   2. The request URL from Section 9.1.2.
+   3. The normalized request parameters string from Section 9.1.1."
+  [method :- (s/either s/Keyword s/Str)
+   uri :- s/Str
+   params :- {(s/either s/Keyword s/Str) s/Any}]
+  base-string
+  (format "%s&%s&%s"
+          (-> method name str/upper-case)
+          (codec/url-encode uri)
+          (codec/url-encode (codec/form-encode params))))
+
 ;; -----------------------------------------------------------------------------
 ;; Request token
 
@@ -98,28 +126,7 @@
          "oauth_timestamp" (->seconds (System/currentTimeMillis))
          "oauth_version" "1.0")
 
-        ;; http://oauth.net/core/1.0/#anchor14
-        ;;
-        ;; The Signature Base String is a consistent reproducible concatenation
-        ;; of the request elements into a single string. The string is used as
-        ;; an input in hashing or signing algorithms. The HMAC-SHA1 signature
-        ;; method provides both a standard and an example of using the Signature
-        ;; Base String with a signing algorithm to generate signatures. All the
-        ;; request parameters MUST be encoded as described in Parameter Encoding
-        ;; prior to constructing the Signature Base String.
-        ;;
-        ;; The following items MUST be concatenated in order into a single
-        ;; string. Each item is encoded and separated by an ‘&’ character (ASCII
-        ;; code 38), even if empty.
-        ;;
-        ;; 1. The HTTP request method used to send the request. Value MUST be
-        ;;    uppercase, for example: `HEAD`, `GET`, `POST`, etc.
-        ;; 2. The request URL from Section 9.1.2.
-        ;; 3. The normalized request parameters string from Section 9.1.1.
-        base-string
-        (format "POST&%s&%s"
-                (codec/url-encode (:request-uri consumer))
-                (codec/url-encode (codec/form-encode auth-params)))
+        base-string (base-string :post (:request-uri consumer) auth-params)
 
         ;; http://oauth.net/core/1.0/#signing_process
         ;;
@@ -191,28 +198,7 @@
          (when-let [verifier (get creds "oauth_verifier")]
            {"oauth_verifier" verifier}))
 
-        ;; http://oauth.net/core/1.0/#anchor14
-        ;;
-        ;; The Signature Base String is a consistent reproducible concatenation
-        ;; of the request elements into a single string. The string is used as
-        ;; an input in hashing or signing algorithms. The HMAC-SHA1 signature
-        ;; method provides both a standard and an example of using the Signature
-        ;; Base String with a signing algorithm to generate signatures. All the
-        ;; request parameters MUST be encoded as described in Parameter Encoding
-        ;; prior to constructing the Signature Base String.
-        ;;
-        ;; The following items MUST be concatenated in order into a single
-        ;; string. Each item is encoded and separated by an ‘&’ character (ASCII
-        ;; code 38), even if empty.
-        ;;
-        ;; 1. The HTTP request method used to send the request. Value MUST be
-        ;;    uppercase, for example: `HEAD`, `GET`, `POST`, etc.
-        ;; 2. The request URL from Section 9.1.2.
-        ;; 3. The normalized request parameters string from Section 9.1.1.
-        base-string
-        (format "POST&%s&%s"
-                (codec/url-encode (:access-uri consumer))
-                (codec/url-encode (codec/form-encode auth-params)))
+        base-string (base-string :post (:access-uri consumer) auth-params)
 
         ;; http://oauth.net/core/1.0/#signing_process
         ;;
