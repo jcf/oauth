@@ -18,14 +18,16 @@
   (s/enum "HMAC-SHA1" "PLAINTEXT" "RSA-SHA1"))
 
 (def ^:private OAuthAuthorization
-  {(s/optional-key "oauth_version") (s/eq "1.0")
+  {(s/optional-key "oauth_token") s/Str
+   (s/optional-key "oauth_verifier") s/Str
+   (s/optional-key "oauth_version") (s/eq "1.0")
    (s/required-key "oauth_consumer_key") s/Str
    (s/required-key "oauth_nonce") s/Str
    (s/required-key "oauth_signature") s/Str
    (s/required-key "oauth_signature_method") SignatureMethod
    (s/required-key "oauth_timestamp") s/Str})
 
-(def ^:private RequestTokenRequest
+(def ^:private SignedRequest
   {:headers {(s/required-key "Authorization") s/Str
              (s/required-key "Content-Type") (s/eq urlencoded)
              s/Str s/Str}
@@ -96,7 +98,7 @@
         auth (-> request
                  (get-in [:headers "Authorization"])
                  parse-auth-header)]
-    (is (nil? (s/check RequestTokenRequest request)))
+    (is (nil? (s/check SignedRequest request)))
     (is (= "http://example.com/token" (:url request)))
     (is (nil? (s/check OAuthAuthorization auth)))
     (are [k v] (= (get auth k ::missing) v)
@@ -117,3 +119,22 @@
              "oauth_token" "token"}]
            (split-url (authorization-url
                        consumer {"oauth_token" "token" :a 1 :b 2}))))))
+
+;; -----------------------------------------------------------------------------
+;; Access token request
+
+(deftest t-access-token-request
+  (let [consumer (make-consumer consumer-config)
+        request (access-token-request consumer {"oauth_token" "token"
+                                                "oauth_verifier" "verifier"})
+        auth (-> request
+                 (get-in [:headers "Authorization"])
+                 parse-auth-header)]
+    (is (nil? (s/check SignedRequest request)))
+    (is (= "http://example.com/access" (:url request)))
+    (is (nil? (s/check OAuthAuthorization auth)))
+    (are [k v] (= (get auth k ::missing) v)
+      "oauth_consumer_key" "key"
+      "oauth_signature_method" "HMAC-SHA1"
+      "oauth_token" "token"
+      "oauth_verifier" "verifier")))

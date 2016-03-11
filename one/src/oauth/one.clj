@@ -170,3 +170,81 @@
             (merge params
                    (when-let [s (:callback-uri consumer)]
                      {"oauth_callback" s}))))))
+
+;; -----------------------------------------------------------------------------
+;; Access token request
+
+(s/defn ^:always-validate access-token-request
+  [consumer :- Consumer
+   creds :- {(s/optional-key "oauth_token") s/Str
+             (s/optional-key "oauth_verifier") s/Str}]
+  (let [auth-params
+        (merge
+         (sorted-map
+          "oauth_consumer_key" (:key consumer)
+          "oauth_nonce" (random/url-part 32)
+          "oauth_signature_method" (-> consumer :signature-algo signature-algos)
+          "oauth_timestamp" (->seconds (System/currentTimeMillis))
+          "oauth_version" "1.0")
+         (when-let [token (get creds "oauth_token")]
+           {"oauth_token" token})
+         (when-let [verifier (get creds "oauth_verifier")]
+           {"oauth_verifier" verifier}))
+
+        ;; http://oauth.net/core/1.0/#anchor14
+        ;;
+        ;; The Signature Base String is a consistent reproducible concatenation
+        ;; of the request elements into a single string. The string is used as
+        ;; an input in hashing or signing algorithms. The HMAC-SHA1 signature
+        ;; method provides both a standard and an example of using the Signature
+        ;; Base String with a signing algorithm to generate signatures. All the
+        ;; request parameters MUST be encoded as described in Parameter Encoding
+        ;; prior to constructing the Signature Base String.
+        ;;
+        ;; The following items MUST be concatenated in order into a single
+        ;; string. Each item is encoded and separated by an ‘&’ character (ASCII
+        ;; code 38), even if empty.
+        ;;
+        ;; 1. The HTTP request method used to send the request. Value MUST be
+        ;;    uppercase, for example: `HEAD`, `GET`, `POST`, etc.
+        ;; 2. The request URL from Section 9.1.2.
+        ;; 3. The normalized request parameters string from Section 9.1.1.
+        base-string
+        (format "POST&%s&%s"
+                (codec/url-encode (:access-uri consumer))
+                (codec/url-encode (codec/form-encode auth-params)))
+
+        ;; http://oauth.net/core/1.0/#signing_process
+        ;;
+        ;; All Token requests and Protected Resources requests MUST be signed by
+        ;; the Consumer and verified by the Service Provider. The purpose of
+        ;; signing requests is to prevent unauthorized parties from using the
+        ;; Consumer Key and Tokens when making Token requests or Protected
+        ;; Resources requests. The signature process encodes the Consumer Secret
+        ;; and Token Secret into a verifiable value which is included with the
+        ;; request.
+        ;;
+        ;; OAuth does not mandate a particular signature method, as each
+        ;; implementation can have its own unique requirements. The protocol
+        ;; defines three signature methods: HMAC-SHA1, RSA-SHA1, and PLAINTEXT,
+        ;; but Service Providers are free to implement and document their own
+        ;; methods. Recommending any particular method is beyond the scope of
+        ;; this specification.
+        ;;
+        ;; The Consumer declares a signature method in the
+        ;; `oauth_signature_method` parameter, generates a signature, and stores
+        ;; it in the `oauth_signature` parameter. The Service Provider verifies
+        ;; the signature as specified in each method. When verifying a Consumer
+        ;; signature, the Service Provider SHOULD check the request nonce to
+        ;; ensure it has not been used in a previous Consumer request.
+        ;;
+        ;; The signature process MUST NOT change the request parameter names or
+        ;; values, with the exception of the `oauth_signature` parameter.
+        signed-auth-params (assoc auth-params "oauth_signature"
+                                  (sign consumer base-string))
+        authorization (auth-headers->str signed-auth-params)]
+    {:headers {"Authorization" (str "OAuth " authorization)
+               "Accept" "application/json"
+               "Content-Type" "application/x-www-form-urlencoded"}
+     :request-method :post
+     :url (:access-uri consumer)}))
