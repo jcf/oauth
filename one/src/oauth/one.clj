@@ -106,19 +106,20 @@
 ;; Request token
 
 (s/defn ^:always-validate request-token-request
+  "Generate a clj-http compatible request map that will request a token from the
+   provider associated with `consumer`.
+
+   http://oauth.net/core/1.0/#auth_step1
+
+   The Consumer obtains an unauthorized Request Token by asking the Service
+   Provider to issue a Token. The Request Token’s sole purpose is to receive
+   User approval and can only be used to obtain an Access Token.
+
+   To obtain a Request Token, the Consumer sends an HTTP request to the Service
+   Provider’s Request Token URL. The Service Provider documentation specifies
+   the HTTP method for this request, and HTTP POST is RECOMMENDED."
   [consumer :- Consumer]
-  (let [;; http://oauth.net/core/1.0/#auth_step1
-        ;;
-        ;; The Consumer obtains an unauthorized Request Token by asking the
-        ;; Service Provider to issue a Token. The Request Token’s sole purpose
-        ;; is to receive User approval and can only be used to obtain an Access
-        ;; Token.
-        ;;
-        ;; To obtain a Request Token, the Consumer sends an HTTP request to the
-        ;; Service Provider’s Request Token URL. The Service Provider
-        ;; documentation specifies the HTTP method for this request, and HTTP
-        ;; POST is RECOMMENDED.
-        auth-params
+  (let [auth-params
         (sorted-map
          "oauth_consumer_key" (:key consumer)
          "oauth_nonce" (random/url-part 32)
