@@ -74,6 +74,9 @@
                  (codec/url-encode secret)
                  (codec/url-encode token-secret))))))))
 
+;; -----------------------------------------------------------------------------
+;; Request token
+
 (s/defn ^:always-validate request-token-request
   [consumer :- Consumer]
   (let [;; http://oauth.net/core/1.0/#auth_step1
@@ -152,3 +155,18 @@
                "Content-Type" "application/x-www-form-urlencoded"}
      :request-method :post
      :url (:request-uri consumer)}))
+
+;; -----------------------------------------------------------------------------
+;; User authorisation
+
+(s/defn authorization-url
+  ([consumer :- Consumer] (authorization-url consumer {}))
+  ([consumer :- Consumer
+    params :- {(s/optional-key "oauth_token") s/Str
+               (s/either s/Keyword s/Str) s/Any}]
+   (format "%s?%s"
+           (:authorize-uri consumer)
+           (codec/form-encode
+            (merge params
+                   (when-let [s (:callback-uri consumer)]
+                     {"oauth_callback" s}))))))

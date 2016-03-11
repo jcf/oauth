@@ -3,7 +3,8 @@
             [oauth.one :refer :all]
             [schema.test :refer [validate-schemas]]
             [clojure.string :as str]
-            [schema.core :as s]))
+            [schema.core :as s]
+            [ring.util.codec :as codec]))
 
 (use-fixtures :once validate-schemas)
 
@@ -51,6 +52,20 @@
    {}
    (str/split (str/replace s #"^OAuth\s+" "") #",\s+")))
 
+(defn- parse-uri
+  [^String url]
+  (let [uri (java.net.URI. url)]
+    {:authority (.getAuthority uri)
+     :host (.getHost uri)
+     :path (.getPath uri)
+     :query (.getQuery uri)
+     :scheme (.getScheme uri)}))
+
+(defn- split-url
+  [^String url]
+  (let [{:keys [scheme host path query]} (parse-uri url)]
+    [(str scheme "://" host path) (codec/form-decode query)]))
+
 ;; -----------------------------------------------------------------------------
 ;; Consumer
 
@@ -87,3 +102,18 @@
     (are [k v] (= (get auth k ::missing) v)
       "oauth_consumer_key" "key"
       "oauth_signature_method" "HMAC-SHA1")))
+
+;; -----------------------------------------------------------------------------
+;; Authorisation URL
+
+(deftest t-authorization-url
+  (let [consumer (make-consumer consumer-config)]
+    (is (= ["http://example.com/authorize"
+            {"oauth_callback" "http://localhost/oauth/callback"}]
+           (split-url (authorization-url consumer))))
+    (is (= ["http://example.com/authorize"
+            {"a" "1" "b" "2"
+             "oauth_callback" "http://localhost/oauth/callback"
+             "oauth_token" "token"}]
+           (split-url (authorization-url
+                       consumer {"oauth_token" "token" :a 1 :b 2}))))))
