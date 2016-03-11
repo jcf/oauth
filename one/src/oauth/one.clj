@@ -1,4 +1,32 @@
 (ns oauth.one
+  "Provides functions for generating requests, and parsing responses necessary
+  for integrating with three-legged OAuth 1.0 providers like Twitter.
+
+  All Token requests and Protected Resources requests MUST be signed by the
+  Consumer and verified by the Service Provider. The purpose of signing requests
+  is to prevent unauthorized parties from using the Consumer Key and Tokens when
+  making Token requests or Protected Resources requests. The signature process
+  encodes the Consumer Secret and Token Secret into a verifiable value which is
+  included with the request.
+
+  OAuth does not mandate a particular signature method, as each implementation
+  can have its own unique requirements. The protocol defines three signature
+  methods: HMAC-SHA1, RSA-SHA1, and PLAINTEXT, but Service Providers are free to
+  implement and document their own methods. Recommending any particular method
+  is beyond the scope of this specification.
+
+  The Consumer declares a signature method in the `oauth_signature_method`
+  parameter, generates a signature, and stores it in the `oauth_signature`
+  parameter. The Service Provider verifies the signature as specified in each
+  method. When verifying a Consumer signature, the Service Provider SHOULD check
+  the request nonce to ensure it has not been used in a previous Consumer
+  request.
+
+  The signature process MUST NOT change the request parameter names or values,
+  with the exception of the `oauth_signature` parameter.
+
+  For more information refer to the OAuth 1.0 specification at
+  http://oauth.net/core/1.0/#signing_process."
   (:require [clojure.string :as str]
             [crypto.random :as random]
             [pandect.core :as pandect]
@@ -24,6 +52,9 @@
    :request-uri s/Str
    :secret s/Str
    :signature-algo SignatureAlgo})
+
+(def ^:private Map
+  {(s/either s/Keyword s/Str) s/Any})
 
 (defrecord Consumer
     [access-uri authorize-uri callback-uri key secret signature-algo])
@@ -95,7 +126,7 @@
    3. The normalized request parameters string from Section 9.1.1."
   [method :- (s/either s/Keyword s/Str)
    uri :- s/Str
-   params :- {(s/either s/Keyword s/Str) s/Any}]
+   params :- Map]
   base-string
   (format "%s&%s&%s"
           (-> method name str/upper-case)
@@ -127,37 +158,15 @@
          "oauth_timestamp" (->seconds (System/currentTimeMillis))
          "oauth_version" "1.0")
 
-        base-string (base-string :post (:request-uri consumer) auth-params)
+        base-string
+        (base-string :post (:request-uri consumer) auth-params)
 
-        ;; http://oauth.net/core/1.0/#signing_process
-        ;;
-        ;; All Token requests and Protected Resources requests MUST be signed by
-        ;; the Consumer and verified by the Service Provider. The purpose of
-        ;; signing requests is to prevent unauthorized parties from using the
-        ;; Consumer Key and Tokens when making Token requests or Protected
-        ;; Resources requests. The signature process encodes the Consumer Secret
-        ;; and Token Secret into a verifiable value which is included with the
-        ;; request.
-        ;;
-        ;; OAuth does not mandate a particular signature method, as each
-        ;; implementation can have its own unique requirements. The protocol
-        ;; defines three signature methods: HMAC-SHA1, RSA-SHA1, and PLAINTEXT,
-        ;; but Service Providers are free to implement and document their own
-        ;; methods. Recommending any particular method is beyond the scope of
-        ;; this specification.
-        ;;
-        ;; The Consumer declares a signature method in the
-        ;; `oauth_signature_method` parameter, generates a signature, and stores
-        ;; it in the `oauth_signature` parameter. The Service Provider verifies
-        ;; the signature as specified in each method. When verifying a Consumer
-        ;; signature, the Service Provider SHOULD check the request nonce to
-        ;; ensure it has not been used in a previous Consumer request.
-        ;;
-        ;; The signature process MUST NOT change the request parameter names or
-        ;; values, with the exception of the `oauth_signature` parameter.
-        signed-auth-params (assoc auth-params "oauth_signature"
-                                  (sign consumer base-string))
-        authorization (auth-headers->str signed-auth-params)]
+        signed-auth-params
+        (assoc auth-params "oauth_signature" (sign consumer base-string))
+
+        authorization
+        (auth-headers->str signed-auth-params)]
+
     {:headers {"Authorization" (str "OAuth " authorization)
                "Accept" "application/json"
                "Content-Type" "application/x-www-form-urlencoded"}
@@ -170,8 +179,7 @@
 (s/defn authorization-url
   ([consumer :- Consumer] (authorization-url consumer {}))
   ([consumer :- Consumer
-    params :- {(s/optional-key "oauth_token") s/Str
-               (s/either s/Keyword s/Str) s/Any}]
+    params :- (assoc Map (s/optional-key "oauth_token") s/Str)]
    (format "%s?%s"
            (:authorize-uri consumer)
            (codec/form-encode
@@ -199,37 +207,15 @@
          (when-let [verifier (get creds "oauth_verifier")]
            {"oauth_verifier" verifier}))
 
-        base-string (base-string :post (:access-uri consumer) auth-params)
+        base-string
+        (base-string :post (:access-uri consumer) auth-params)
 
-        ;; http://oauth.net/core/1.0/#signing_process
-        ;;
-        ;; All Token requests and Protected Resources requests MUST be signed by
-        ;; the Consumer and verified by the Service Provider. The purpose of
-        ;; signing requests is to prevent unauthorized parties from using the
-        ;; Consumer Key and Tokens when making Token requests or Protected
-        ;; Resources requests. The signature process encodes the Consumer Secret
-        ;; and Token Secret into a verifiable value which is included with the
-        ;; request.
-        ;;
-        ;; OAuth does not mandate a particular signature method, as each
-        ;; implementation can have its own unique requirements. The protocol
-        ;; defines three signature methods: HMAC-SHA1, RSA-SHA1, and PLAINTEXT,
-        ;; but Service Providers are free to implement and document their own
-        ;; methods. Recommending any particular method is beyond the scope of
-        ;; this specification.
-        ;;
-        ;; The Consumer declares a signature method in the
-        ;; `oauth_signature_method` parameter, generates a signature, and stores
-        ;; it in the `oauth_signature` parameter. The Service Provider verifies
-        ;; the signature as specified in each method. When verifying a Consumer
-        ;; signature, the Service Provider SHOULD check the request nonce to
-        ;; ensure it has not been used in a previous Consumer request.
-        ;;
-        ;; The signature process MUST NOT change the request parameter names or
-        ;; values, with the exception of the `oauth_signature` parameter.
-        signed-auth-params (assoc auth-params "oauth_signature"
-                                  (sign consumer base-string))
-        authorization (auth-headers->str signed-auth-params)]
+        signed-auth-params
+        (assoc auth-params "oauth_signature" (sign consumer base-string))
+
+        authorization
+        (auth-headers->str signed-auth-params)]
+
     {:headers {"Authorization" (str "OAuth " authorization)
                "Accept" "application/json"
                "Content-Type" "application/x-www-form-urlencoded"}
