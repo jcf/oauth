@@ -44,6 +44,9 @@
 (def ^:private SignatureAlgo
   (apply s/enum (keys signature-algos)))
 
+(def ^:private SignatureMethod
+  (apply s/enum (vals signature-algos)))
+
 (def ^:private ConsumerConfig
   {:access-uri s/Str
    :authorize-uri s/Str
@@ -55,6 +58,24 @@
 
 (def ^:private Map
   {(s/either s/Keyword s/Str) s/Any})
+
+(def OAuthAuthorization
+  {(s/optional-key "oauth_token") s/Str
+   (s/optional-key "oauth_verifier") s/Str
+   (s/optional-key "oauth_version") (s/eq "1.0")
+   (s/required-key "oauth_consumer_key") s/Str
+   (s/required-key "oauth_nonce") s/Str
+   (s/required-key "oauth_signature_method") SignatureMethod
+   (s/required-key "oauth_timestamp") (s/either s/Str s/Int)})
+
+(def SignedOAuthAuthorization
+  (assoc OAuthAuthorization (s/required-key "oauth_signature") s/Str))
+
+(def ^:private OAuthRequest
+  {(s/optional-key :headers) Map
+   :oauth-params OAuthAuthorization
+   :request-method (s/enum :delete :get :head :patch :post :put :trace)
+   :url s/Str})
 
 (defrecord Consumer
     [access-uri authorize-uri callback-uri key secret signature-algo])
@@ -68,18 +89,18 @@
 
 (s/defn auth-headers->str :- s/Str
   "The OAuth Protocol Parameters are sent in the Authorization header the
-   following way:
+  following way:
 
-   1. Parameter names and values are encoded per Parameter Encoding.
-   2. For each parameter, the name is immediately followed by an ‘=’ character
-      (ASCII code 61), a ‘”’ character (ASCII code 34), the parameter value (MAY
-      be empty), and another ‘”’ character (ASCII code 34).
-   3. Parameters are separated by a comma character (ASCII code 44) and OPTIONAL
-      linear whitespace per [RFC2617](http://oauth.net/core/1.0/#RFC2617).
-   4. The OPTIONAL realm parameter is added and interpreted per
-      [RFC2617](http://oauth.net/core/1.0/#RFC2617), section 1.2.
+  1. Parameter names and values are encoded per Parameter Encoding.
+  2. For each parameter, the name is immediately followed by an ‘=’ character
+     (ASCII code 61), a ‘”’ character (ASCII code 34), the parameter value (MAY
+     be empty), and another ‘”’ character (ASCII code 34).
+  3. Parameters are separated by a comma character (ASCII code 44) and OPTIONAL
+     linear whitespace per [RFC2617](http://oauth.net/core/1.0/#RFC2617).
+  4. The OPTIONAL realm parameter is added and interpreted per
+     [RFC2617](http://oauth.net/core/1.0/#RFC2617), section 1.2.
 
-   http://oauth.net/core/1.0/#auth_header"
+  http://oauth.net/core/1.0/#auth_header"
   [m :- {s/Str s/Any}]
   (->> m
        (map #(format "%s=\"%s\""
@@ -108,22 +129,22 @@
 (s/defn ^:private base-string :- s/Str
   "http://oauth.net/core/1.0/#anchor14
 
-   The Signature Base String is a consistent reproducible concatenation of the
-   request elements into a single string. The string is used as an input in
-   hashing or signing algorithms. The HMAC-SHA1 signature method provides both a
-   standard and an example of using the Signature Base String with a signing
-   algorithm to generate signatures. All the request parameters MUST be encoded
-   as described in Parameter Encoding prior to constructing the Signature Base
-   String.
+  The Signature Base String is a consistent reproducible concatenation of the
+  request elements into a single string. The string is used as an input in
+  hashing or signing algorithms. The HMAC-SHA1 signature method provides both a
+  standard and an example of using the Signature Base String with a signing
+  algorithm to generate signatures. All the request parameters MUST be encoded
+  as described in Parameter Encoding prior to constructing the Signature Base
+  String.
 
-   The following items MUST be concatenated in order into a single string. Each
-   item is encoded and separated by an ‘&’ character (ASCII code 38), even if
-   empty.
+  The following items MUST be concatenated in order into a single string. Each
+  item is encoded and separated by an ‘&’ character (ASCII code 38), even if
+  empty.
 
-   1. The HTTP request method used to send the request. Value MUST be uppercase,
-      for example: `HEAD`, `GET`, `POST`, etc.
-   2. The request URL from Section 9.1.2.
-   3. The normalized request parameters string from Section 9.1.1."
+  1. The HTTP request method used to send the request. Value MUST be uppercase,
+     for example: `HEAD`, `GET`, `POST`, etc.
+  2. The request URL from Section 9.1.2.
+  3. The normalized request parameters string from Section 9.1.1."
   [method :- (s/either s/Keyword s/Str)
    uri :- s/Str
    params :- Map]
@@ -133,45 +154,48 @@
           (codec/url-encode uri)
           (codec/url-encode (codec/form-encode params))))
 
+;; FIXME Add return schema
+(s/defn signed-request
+  [consumer :- Consumer
+   {:keys [request-method oauth-params url] :as oauth-request} :- OAuthRequest]
+  (let [base-string (base-string request-method url oauth-params)
+        signed-params (assoc oauth-params "oauth_signature"
+                             (sign consumer base-string))]
+    (-> oauth-request
+        (dissoc :oauth-params)
+        (assoc-in [:headers "Content-Type"]
+                  "application/x-www-form-urlencoded")
+        (assoc-in [:headers "Authorization"]
+                  (str "OAuth " (auth-headers->str signed-params))))))
+
 ;; -----------------------------------------------------------------------------
 ;; Request token
 
-(s/defn ^:always-validate request-token-request
+(s/defn request-token-request
   "Generate a clj-http compatible request map that will request a token from the
-   provider associated with `consumer`.
+  provider associated with `consumer`.
 
-   http://oauth.net/core/1.0/#auth_step1
+  http://oauth.net/core/1.0/#auth_step1
 
-   The Consumer obtains an unauthorized Request Token by asking the Service
-   Provider to issue a Token. The Request Token’s sole purpose is to receive
-   User approval and can only be used to obtain an Access Token.
+  The Consumer obtains an unauthorized Request Token by asking the Service
+  Provider to issue a Token. The Request Token’s sole purpose is to receive
+  User approval and can only be used to obtain an Access Token.
 
-   To obtain a Request Token, the Consumer sends an HTTP request to the Service
-   Provider’s Request Token URL. The Service Provider documentation specifies
-   the HTTP method for this request, and HTTP POST is RECOMMENDED."
+  To obtain a Request Token, the Consumer sends an HTTP request to the Service
+  Provider’s Request Token URL. The Service Provider documentation specifies
+  the HTTP method for this request, and HTTP POST is RECOMMENDED."
   [consumer :- Consumer]
-  (let [auth-params
-        (sorted-map
-         "oauth_consumer_key" (:key consumer)
-         "oauth_nonce" (random/url-part 32)
-         "oauth_signature_method" (-> consumer :signature-algo signature-algos)
-         "oauth_timestamp" (->seconds (System/currentTimeMillis))
-         "oauth_version" "1.0")
-
-        base-string
-        (base-string :post (:request-uri consumer) auth-params)
-
-        signed-auth-params
-        (assoc auth-params "oauth_signature" (sign consumer base-string))
-
-        authorization
-        (auth-headers->str signed-auth-params)]
-
-    {:headers {"Authorization" (str "OAuth " authorization)
-               "Accept" "application/json"
-               "Content-Type" "application/x-www-form-urlencoded"}
-     :request-method :post
-     :url (:request-uri consumer)}))
+  (signed-request
+   consumer
+   {:oauth-params
+    (sorted-map
+     "oauth_consumer_key" (:key consumer)
+     "oauth_nonce" (random/url-part 32)
+     "oauth_signature_method" (-> consumer :signature-algo signature-algos)
+     "oauth_timestamp" (->seconds (System/currentTimeMillis))
+     "oauth_version" "1.0")
+    :request-method :post
+    :url (:request-uri consumer)}))
 
 ;; -----------------------------------------------------------------------------
 ;; User authorisation
@@ -194,30 +218,19 @@
   [consumer :- Consumer
    creds :- {(s/optional-key "oauth_token") s/Str
              (s/optional-key "oauth_verifier") s/Str}]
-  (let [auth-params
-        (merge
-         (sorted-map
-          "oauth_consumer_key" (:key consumer)
-          "oauth_nonce" (random/url-part 32)
-          "oauth_signature_method" (-> consumer :signature-algo signature-algos)
-          "oauth_timestamp" (->seconds (System/currentTimeMillis))
-          "oauth_version" "1.0")
-         (when-let [token (get creds "oauth_token")]
-           {"oauth_token" token})
-         (when-let [verifier (get creds "oauth_verifier")]
-           {"oauth_verifier" verifier}))
-
-        base-string
-        (base-string :post (:access-uri consumer) auth-params)
-
-        signed-auth-params
-        (assoc auth-params "oauth_signature" (sign consumer base-string))
-
-        authorization
-        (auth-headers->str signed-auth-params)]
-
-    {:headers {"Authorization" (str "OAuth " authorization)
-               "Accept" "application/json"
-               "Content-Type" "application/x-www-form-urlencoded"}
-     :request-method :post
-     :url (:access-uri consumer)}))
+  (signed-request
+   consumer
+   {:oauth-params
+    (merge
+     (sorted-map
+      "oauth_consumer_key" (:key consumer)
+      "oauth_nonce" (random/url-part 32)
+      "oauth_signature_method" (-> consumer :signature-algo signature-algos)
+      "oauth_timestamp" (->seconds (System/currentTimeMillis))
+      "oauth_version" "1.0")
+     (when-let [token (get creds "oauth_token")]
+       {"oauth_token" token})
+     (when-let [verifier (get creds "oauth_verifier")]
+       {"oauth_verifier" verifier}))
+    :request-method :post
+    :url (:access-uri consumer)}))

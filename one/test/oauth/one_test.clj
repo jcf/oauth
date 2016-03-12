@@ -14,19 +14,6 @@
 (def ^:private urlencoded
   "application/x-www-form-urlencoded")
 
-(def ^:private SignatureMethod
-  (s/enum "HMAC-SHA1" "PLAINTEXT" "RSA-SHA1"))
-
-(def ^:private OAuthAuthorization
-  {(s/optional-key "oauth_token") s/Str
-   (s/optional-key "oauth_verifier") s/Str
-   (s/optional-key "oauth_version") (s/eq "1.0")
-   (s/required-key "oauth_consumer_key") s/Str
-   (s/required-key "oauth_nonce") s/Str
-   (s/required-key "oauth_signature") s/Str
-   (s/required-key "oauth_signature_method") SignatureMethod
-   (s/required-key "oauth_timestamp") s/Str})
-
 (def ^:private SignedRequest
   {:headers {(s/required-key "Authorization") s/Str
              (s/required-key "Content-Type") (s/eq urlencoded)
@@ -100,7 +87,7 @@
                  parse-auth-header)]
     (is (nil? (s/check SignedRequest request)))
     (is (= "http://example.com/token" (:url request)))
-    (is (nil? (s/check OAuthAuthorization auth)))
+    (is (nil? (s/check SignedOAuthAuthorization auth)))
     (are [k v] (= (get auth k ::missing) v)
       "oauth_consumer_key" "key"
       "oauth_signature_method" "HMAC-SHA1")))
@@ -132,7 +119,7 @@
                  parse-auth-header)]
     (is (nil? (s/check SignedRequest request)))
     (is (= "http://example.com/access" (:url request)))
-    (is (nil? (s/check OAuthAuthorization auth)))
+    (is (nil? (s/check SignedOAuthAuthorization auth)))
     (are [k v] (= (get auth k ::missing) v)
       "oauth_consumer_key" "key"
       "oauth_signature_method" "HMAC-SHA1"
