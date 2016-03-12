@@ -2,7 +2,13 @@
 
 * Installation
 
-  This library is not yet released.
+  This library is a work in progress. Come back soon!
+
+  #+BEGIN_HTML
+  <a href="https://clojars.org/oauth/oauth.one">
+    <img src="https://img.shields.io/clojars/v/oauth/oauth.one.svg"></img>
+  </a>
+  #+END_HTML
 
 * Getting Started
 

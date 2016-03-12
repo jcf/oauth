@@ -14,6 +14,22 @@
 
   This library has yet to be released.
 
+** OAuth 1.0
+
+   #+BEGIN_HTML
+   <a href="https://clojars.org/oauth/oauth.one">
+     <img src="https://img.shields.io/clojars/v/oauth/oauth.one.svg"></img>
+   </a>
+   #+END_HTML
+
+** OAuth 2.0
+
+   #+BEGIN_HTML
+   <a href="https://clojars.org/oauth/oauth.two">
+     <img src="https://img.shields.io/clojars/v/oauth/oauth.two.svg"></img>
+   </a>
+   #+END_HTML
+
 * Progress
 
   OAuth 1.0 support is complete in that it has been tested end-to-end with
