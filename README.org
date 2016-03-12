@@ -1,0 +1,39 @@
+#+TITLE: OAuth
+
+[[https://dl.dropboxusercontent.com/u/508427/imgs/old-chain.jpg]]
+
+*OAuth* implements both OAuth 1.0 and 2.0 in Clojure.
+
+#+BEGIN_HTML
+  <a href="https://circleci.com/gh/jcf/oauth">
+    <img src="https://circleci.com/gh/jcf/oauth.svg"></img>
+  </a>
+#+END_HTML
+
+* Installation
+
+  This library has yet to be released.
+
+** OAuth 1.0
+
+   #+BEGIN_HTML
+   <a href="https://clojars.org/oauth/oauth.one">
+     <img src="https://img.shields.io/clojars/v/oauth/oauth.one.svg"></img>
+   </a>
+   #+END_HTML
+
+** OAuth 2.0
+
+   #+BEGIN_HTML
+   <a href="https://clojars.org/oauth/oauth.two">
+     <img src="https://img.shields.io/clojars/v/oauth/oauth.two.svg"></img>
+   </a>
+   #+END_HTML
+
+* Progress
+
+  OAuth 1.0 support is complete in that it has been tested end-to-end with
+  Twitter.
+
+  OAuth 2.0 support is coming soon. As the easier of the two to implement it
+  won't take long.
