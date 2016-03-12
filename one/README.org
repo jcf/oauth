@@ -1,0 +1,161 @@
+#+TITLE: OAuth One
+
+* Installation
+
+  This library is not yet released.
+
+* Getting Started
+
+  Require the library with a convenient alias that we can make use of later.
+
+  #+begin_src clojure
+    (require '[oauth.one :as o])
+  #+end_src
+
+  Create a consumer using the credentials provided by (in this example) Twitter.
+  The consumer holds on to important URLs, tokens and information about how to
+  generate OAuth requests. We'll pull our consumer key and secret from
+  environment variables to avoid adding sensitive credentials to our repository.
+
+  #+begin_src clojure
+    (def consumer
+      (o/make-consumer
+       {:access-uri "https://api.twitter.com/oauth/access_token"
+        :authorize-uri "https://api.twitter.com/oauth/authorize"
+        :callback-uri "http://127.0.0.1:3000/oauth/callback"
+        :key (System/getenv "TWITTER_CONSUMER_KEY")
+        :request-uri "https://api.twitter.com/oauth/request_token"
+        :secret (System/getenv "TWITTER_CONSUMER_SECRET")
+        :signature-algo :hmac-sha1}))
+  #+end_src
+
+** Request token
+
+   The ~:callback-uri~ is a local address we can use for testing purposes. All
+   of the above can and should be pulled from whatever configuration system
+   you're using your application (I'd recommend a combination of [[https://github.com/weavejester/environ][environ]] and
+   [[https://github.com/plumatic/schema][Schema]]). Check out my [[https://github.com/jcf/lein-template][lein-template]] for an example of how to pull your
+   configuration from environment variables and both validate and coerce the
+   data.
+
+   Now that you have a consumer you can build a request to request a token.
+
+   #+begin_src clojure
+    (o/request-token-request consumer)
+   #+end_src
+
+   ~request-token-request~ returns a ~clj-http~ compatible hash-map that can be
+   passed to your favourite HTTP library quite easily. An example request map
+   looks something like this:
+
+   #+begin_src clojure
+    {:request-method :post,
+     :url "https://api.twitter.com/oauth/request_token",
+     :headers
+     {"Content-Type" "application/x-www-form-urlencoded",
+      "Authorization"
+      "OAuth oauth_consumer_key=\"nTCqzIs2jIWSHZw2YNGmw\", oauth_nonce=\"KT-vrp_EqXfYnaCkSartQf3atjj9TK5TxqR44ap25bM\", oauth_signature=\"5Hljpn2TUSeJO4UWR6M8IpxVvuo%3D\", oauth_signature_method=\"HMAC-SHA1\", oauth_timestamp=\"1457741832\", oauth_version=\"1.0\""},
+     :throw-exceptions? false}
+   #+end_src
+
+   To send the request simply pass the request map to your favourite HTTP
+   client.
+
+   #+begin_src clojure
+    (require '[clj-http.client])
+    (clj-http.client/request (o/request-token-request consumer))
+
+    (require '[aleph.http])
+    (aleph.http/request (o/request-token-request consumer))
+   #+end_src
+
+** Authorisation URL
+
+   The response you get back from the above ~request-token-request~ will include
+   an ~oauth_token~ you can use to ask the user for access to his or her
+   account.
+
+   Let's assume you used Aleph to send the ~request-token-request~ request.
+
+   #+begin_src clojure
+     (def parse-form
+       (comp ring.util.codec/form-decode byte-streams/to-string))
+
+     (def request-token-response
+       @(manifold.deferred/chain
+         (aleph.http/request (o/request-token-request consumer))
+         #(update % :body parse-form)))
+
+     ;; (:body request-token-response)
+     ;; => {"oauth_token" "t89IVgAAAAAADf8pAAABU2gvEc8",
+     ;;     "oauth_token_secret" "XKkTgSNsLNNqRFyZPTf6W4OJT428JeL2",
+     ;;     "oauth_callback_confirmed" "true"}
+
+     (authorization-url
+      consumer
+      {"oauth_token" (get-in request-token-response [:body "oauth_token"])})
+   #+end_src
+
+   ~authorization-url~ will return a string URL that you can send a user to in
+   order to kick of the user-facing part of the OAuth flow.
+
+   [[https://dl.dropboxusercontent.com/u/508427/imgs/twitter-oauth-flow-example.png]]
+
+** Access token
+
+   When the user surely decides to grant you access to his or her account the
+   OAuth provider sends the user to your ~:callback-uri~. Some providers allow
+   you to change this URL, others do not. Last time I check Twitter allowed you
+   to opt in or out of locking the ~:callback-uri~, which is great in
+   production.
+
+   When redirected back you'll receive a couple of ~GET~ parameters containing
+   two important values needed to finally get your hands on an access token. The
+   URL will be of the following form:
+
+   http://example.com/oauth/callback?{oauth_token,oauth_verifier}
+
+   (If you're not familiar with the above notation the curly braces indicate
+   ~GET~ parameters that will show up on the end of your URL.)
+
+   You'll need an HTTP endpoint to capture the incoming request from your OAuth
+   provider, and you'll need to parse the ~oauth_token~ and ~oauth_verifier~.
+   It's pretty straight forward to do so with ~ring.util.codec~:
+
+   #+begin_src clojure
+     (defn parse-verifier-url
+       [^String url]
+       (let [uri (java.net.URI. url)]
+         (ring.util.codec/form-decode (.getQuery url))))
+
+     (parse-verifier-url
+      "http://127.0.0.1:3000/oauth/callback?oauth_token=abc123&oauth_verifier=cba321")
+     ;; => {"oauth_token" "abc123" "oauth_verifier" "cba321"}
+   #+end_src
+
+   Keep hold of both the ~oauth_token~ and ~oauth_verifier~ because you need
+   them to get your hands on an access token.
+
+   Now we can send a request to get an access token! Hooray!
+
+   #+begin_src clojure
+     (access-token-request consumer {"oauth_token" "abc123"
+                                     "oauth_verifier" "bca321"})
+   #+end_src
+
+   The request will look something like this:
+
+   #+begin_src clojure
+     {:request-method :post,
+      :url "https://api.twitter.com/oauth/access_token",
+      :headers
+      {"Content-Type" "application/x-www-form-urlencoded",
+       "Authorization"
+       "OAuth oauth_consumer_key=\"nTCqzIs2jIWSHZw2YNGmw\", oauth_nonce=\"JJpnpVbOpteucb0LfHPMMZk0g2ehQkkFUM8AT3_oj4Q\", oauth_signature=\"e+tgaWSrN5Mzz5yKmNkhkhheQ6U%3D\", oauth_signature_method=\"HMAC-SHA1\", oauth_timestamp=\"1457743849\", oauth_token=\"F096MgAAAAAADf8pAAABU2fcrTM\", oauth_verifier=\"kk9MGzbHcIMnMMJxpecMak7OXvZTCdLo\", oauth_version=\"1.0\""}}
+   #+end_src
+
+   Again, to actually send the request you can use your favourite HTTP library.
+
+   The response from this last request will contain the actual ~oauth_token~ and
+   ~oauth_token_secret~. These you'll likely want to store in your database
+   because they're the credentials you'll use to masquerade as your new user.
