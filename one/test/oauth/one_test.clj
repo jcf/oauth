@@ -125,3 +125,36 @@
       "oauth_signature_method" "HMAC-SHA1"
       "oauth_token" "token"
       "oauth_verifier" "verifier")))
+
+;; -----------------------------------------------------------------------------
+;; Signature generation
+
+(def ^:private test-requests
+  {"yEzHR87PoGcUSua%2FF+48V%2FNzd3M%3D"
+   {:oauth-params {"oauth_consumer_key" "abc123"
+                   "oauth_nonce" "nonce"
+                   "oauth_signature_method" "HMAC-SHA1"
+                   "oauth_timestamp" "1000"
+                   "oauth_version" "1.0"}
+    :request-method :post
+    :url "https://example.com/"}
+
+   "8ZoF1R8s%2F7JRKivUJkPs%2F1yhaZU%3D"
+   {:form-params {"status" "testing things!"}
+    :oauth-params {"oauth_consumer_key" "abc123"
+                   "oauth_nonce" "nonce"
+                   "oauth_signature_method" "HMAC-SHA1"
+                   "oauth_timestamp" "1000"
+                   "oauth_version" "1.0"}
+    :request-method :post
+    :url "https://example.com/"}})
+
+(deftest t-signed-request
+  (let [consumer (make-consumer consumer-config)]
+    (doseq [[signature oauth-request] test-requests]
+      (let [request (signed-request consumer oauth-request)
+            auth (-> request
+                     (get-in [:headers "Authorization"])
+                     parse-auth-header)]
+        (is (nil? (s/check SignedOAuthAuthorization auth)))
+        (is (= signature (get auth "oauth_signature" ::missing)))))))
