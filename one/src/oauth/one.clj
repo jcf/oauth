@@ -37,6 +37,8 @@
 ;; Schema
 
 (def ^:private signature-algos
+  "Mapping from keyword algorithm used in a consumer to the string version used
+  in the OAuth Authorization header."
   {:hmac-sha1 "HMAC-SHA1"
    :plaintext "PLAINTEXT"
    :rsa-sha1 "RSA-SHA1"})
@@ -57,9 +59,12 @@
    :signature-algo SignatureAlgo})
 
 (def ^:private Map
+  "Hash-map of keyword or string to any value"
   {(s/either s/Keyword s/Str) s/Any})
 
 (def OAuthAuthorization
+  "Valid attributes and corresponding values allowed in the unsigned OAuth
+  Authorization header."
   {(s/optional-key "oauth_token") s/Str
    (s/optional-key "oauth_verifier") s/Str
    (s/optional-key "oauth_version") (s/eq "1.0")
@@ -69,18 +74,41 @@
    (s/required-key "oauth_timestamp") (s/either s/Str s/Int)})
 
 (def SignedOAuthAuthorization
+  "Signed version of the valid attributes and corresponding values allowed in
+  the OAuth Authorization header. See `OAuthAuthorization`."
   (assoc OAuthAuthorization (s/required-key "oauth_signature") s/Str))
 
-(def ^:private OAuthRequest
-  {(s/optional-key :headers) Map
-   :oauth-params OAuthAuthorization
-   :request-method (s/enum :delete :get :head :patch :post :put :trace)
+(def ^:private RequestMethod
+  "Valid HTTP request methods"
+  (s/enum :delete :get :head :patch :post :put :trace))
+
+(def ^:private Request
+  "A clj-http compatible request map that is also OAuth 1.0 compatible."
+  {(s/optional-key :form-params) Map
+   (s/optional-key :headers) {s/Str s/Str}
+   :request-method RequestMethod
    :url s/Str})
+
+(def ^:private OAuthRequest
+  "clj-http compatible request map with required `:oauth-params` that will be
+  used to generate a signature."
+  (assoc Request :oauth-params OAuthAuthorization))
+
+(def ^:private SignedRequest
+  "Signed OAuth request with an Authorization header."
+  (assoc Request
+         (s/optional-key :headers)
+         {(s/required-key "Authorization") s/Str
+          s/Str s/Str}))
+
+;; -----------------------------------------------------------------------------
+;; Consumer
 
 (defrecord Consumer
     [access-uri authorize-uri callback-uri key secret signature-algo])
 
 (s/defn make-consumer :- Consumer
+  "Create a new consumer instance with necessary URIs, key and secret."
   [config :- ConsumerConfig]
   (map->Consumer config))
 
@@ -149,16 +177,19 @@
    uri :- s/Str
    params :- Map]
   base-string
+  {:pre [(sorted? params)]}
   (format "%s&%s&%s"
           (-> method name str/upper-case)
           (codec/url-encode uri)
           (codec/url-encode (codec/form-encode params))))
 
-;; FIXME Add return schema
-(s/defn signed-request
-  [consumer :- Consumer
-   {:keys [request-method oauth-params url] :as oauth-request} :- OAuthRequest]
-  (let [base-string (base-string request-method url oauth-params)
+;; FIXME Take form-params into account
+(s/defn signed-request :- SignedRequest
+  [consumer :- Consumer oauth-request :- OAuthRequest]
+  (let [{:keys [form-params request-method oauth-params url]} oauth-request
+        base-string (base-string request-method
+                                 url
+                                 (merge oauth-params form-params))
         signed-params (assoc oauth-params "oauth_signature"
                              (sign consumer base-string))]
     (-> oauth-request
