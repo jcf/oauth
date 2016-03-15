@@ -65,7 +65,8 @@
 (def OAuthAuthorization
   "Valid attributes and corresponding values allowed in the unsigned OAuth
   Authorization header."
-  {(s/optional-key "oauth_token") s/Str
+  {(s/optional-key "oauth_callback") s/Str
+   (s/optional-key "oauth_token") s/Str
    (s/optional-key "oauth_verifier") s/Str
    (s/optional-key "oauth_version") (s/eq "1.0")
    (s/required-key "oauth_consumer_key") s/Str
@@ -220,6 +221,7 @@
    consumer
    {:oauth-params
     (sorted-map
+     "oauth_callback" (:callback-uri consumer)
      "oauth_consumer_key" (:key consumer)
      "oauth_nonce" (random/url-part 32)
      "oauth_signature_method" (-> consumer :signature-algo signature-algos)

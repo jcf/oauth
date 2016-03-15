@@ -89,6 +89,7 @@
     (is (= "http://example.com/token" (:url request)))
     (is (nil? (s/check SignedOAuthAuthorization auth)))
     (are [k v] (= (get auth k ::missing) v)
+      "oauth_callback" (codec/url-encode "http://localhost/oauth/callback")
       "oauth_consumer_key" "key"
       "oauth_signature_method" "HMAC-SHA1")))
 
