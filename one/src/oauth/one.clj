@@ -177,7 +177,7 @@
    uri :- s/Str
    params :- Map]
   base-string
-  {:pre [(sorted? params)]}
+  {:pre [(sorted? params) (string? uri) (map? params)]}
   (format "%s&%s&%s"
           (-> method name str/upper-case)
           (codec/url-encode uri)
