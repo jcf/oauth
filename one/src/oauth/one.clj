@@ -79,6 +79,13 @@
   the OAuth Authorization header. See `OAuthAuthorization`."
   (assoc OAuthAuthorization (s/required-key "oauth_signature") s/Str))
 
+(def ^:private RequestTokenParams
+  {(s/optional-key "oauth_callback") s/Str})
+
+(def ^:private AuthorizationParams
+  (assoc Map (s/optional-key :callback-uri) s/Str
+         (s/optional-key "oauth_token") s/Str))
+
 (def ^:private RequestMethod
   "Valid HTTP request methods"
   (s/enum :delete :get :head :patch :post :put :trace))
@@ -221,34 +228,50 @@
 
   To obtain a Request Token, the Consumer sends an HTTP request to the Service
   Provider’s Request Token URL. The Service Provider documentation specifies
-  the HTTP method for this request, and HTTP POST is RECOMMENDED."
-  [consumer :- Consumer]
-  (signed-request
-   consumer
-   {:oauth-params
-    (sorted-map
-     "oauth_callback" (:callback-uri consumer)
-     "oauth_consumer_key" (:key consumer)
-     "oauth_nonce" (random/url-part 32)
-     "oauth_signature_method" (-> consumer :signature-algo signature-algos)
-     "oauth_timestamp" (->seconds (System/currentTimeMillis))
-     "oauth_version" "1.0")
-    :request-method :post
-    :url (:request-uri consumer)}))
+  the HTTP method for this request, and HTTP POST is RECOMMENDED.
+
+  Note, if you override the \"oauth_callback\" via `params`, you need to pass
+  the same callback URI to `authorization-url`."
+  ([consumer :- Consumer] (request-token-request consumer {}))
+  ([consumer :- Consumer params :- RequestTokenParams]
+   (signed-request
+    consumer
+    {:oauth-params
+     (sorted-map
+      "oauth_callback" (or (get params "oauth_callback") (:callback-uri consumer))
+      "oauth_consumer_key" (:key consumer)
+      "oauth_nonce" (random/url-part 32)
+      "oauth_signature_method" (-> consumer :signature-algo signature-algos)
+      "oauth_timestamp" (->seconds (System/currentTimeMillis))
+      "oauth_version" "1.0")
+     :request-method :post
+     :url (:request-uri consumer)})))
 
 ;; -----------------------------------------------------------------------------
 ;; User authorisation
 
 (s/defn authorization-url
+  "Generate a provider-specific authorisation URL that you send the user's agent
+  (aka. browser) to typically via an HTTP redirect.
+
+  Optional `params` can be passed to append to the authorisation URL via a query
+  string.
+
+  `params` may contain an \"oauth_callback\" to override any callback URI in the
+  consumer. This can be useful when you need to pass some state for CSRF
+  protection to the OAuth provider.
+
+  Note, if you override the \"oauth_callback\" via `params`, you need to pass
+  the same callback URI to `request-token-request`."
   ([consumer :- Consumer] (authorization-url consumer {}))
-  ([consumer :- Consumer
-    params :- (assoc Map (s/optional-key "oauth_token") s/Str)]
-   (format "%s?%s"
-           (:authorize-uri consumer)
-           (codec/form-encode
-            (merge params
-                   (when-let [s (:callback-uri consumer)]
-                     {"oauth_callback" s}))))))
+  ([consumer :- Consumer params :- AuthorizationParams]
+   (format
+    "%s?%s"
+    (:authorize-uri consumer)
+    (-> {"oauth_callback" (:callback-uri consumer)}
+        (merge params)
+        filter-vals
+        codec/form-encode))))
 
 ;; -----------------------------------------------------------------------------
 ;; Access token request
