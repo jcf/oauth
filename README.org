@@ -2,20 +2,72 @@
 
 [[https://dl.dropboxusercontent.com/u/508427/imgs/old-chain.jpg]]
 
-*OAuth* implements both OAuth 1.0 and 2.0 in Clojure.
-
 #+BEGIN_HTML
 <a href="https://circleci.com/gh/jcf/oauth">
   <img src="https://circleci.com/gh/jcf/oauth.svg"></img>
 </a>
 #+END_HTML
 
-* Installation
-This project is under active development, and has yet to reach 1.0. As such the
-API may change.
+* Introduction
+*Note*: This project is under active development, and has yet to reach 1.0. As
+such the API may change.
 
-*OAuth 1.0* is implemented via [[https://github.com/jcf/oauth-one][oauth/oauth.one]]. For more information on OAuth
-1.0 you should consult [[https://tools.ietf.org/html/rfc5849][RFC 5849]].
+There are two libraries in separate repos that implement version one and version
+two of the OAuth protocol.
 
-*OAuth 2.0* is implemented via [[https://github.com/jcf/oauth-two][oauth/oauth.two]]. For more information on OAuth
-1.0 you should consult [[https://tools.ietf.org/html/rfc6749][RFC 6749]].
+OAuth 1.0 is implemented in [[https://github.com/jcf/oauth-one][jcf/oauth-one]], and OAuth 2.0 is implemented in
+[[https://github.com/jcf/oauth-two][jcf/oauth-two]]. Both repositories contain a README with more information on
+installing them, and using them Both repositories contain a README with more
+information on installing and using them.
+
+#+BEGIN_HTML
+<table>
+  <thead>
+    <tr>
+      <th>Library</th>
+      <th>Dependency</th>
+      <th>Build</th>
+      <th>RFC</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        <a href="https://github.com/jcf/oauth-one">jcf/oauth-one</a>
+      </td>
+      <td>
+        <a href="https://clojars.org/oauth/oauth.one">
+          <img src="https://img.shields.io/clojars/v/oauth/oauth.one.svg"></img>
+        </a>
+      </td>
+      <td>
+        <a href="https://circleci.com/gh/jcf/oauth-one">
+          <img src="https://circleci.com/gh/jcf/oauth-one.svg"></img>
+        </a>
+      </td>
+      <td>
+        <a href="https://tools.ietf.org/html/rfc5849">RFC 5849</a>
+      </td>
+    </tr>
+
+    <tr>
+      <td>
+        <a href="https://github.com/jcf/oauth-two">jcf/oauth-two</a>
+      </td>
+      <td>
+        <a href="https://clojars.org/oauth/oauth.two">
+          <img src="https://img.shields.io/clojars/v/oauth/oauth.two.svg"></img>
+        </a>
+      </td>
+      <td>
+        <a href="https://circleci.com/gh/jcf/oauth-two">
+          <img src="https://circleci.com/gh/jcf/oauth-two.svg"></img>
+        </a>
+      </td>
+      <td>
+        <a href="https://tools.ietf.org/html/rfc6749">RFC 6749</a>
+      </td>
+    </tr>
+  </tbody>
+</table>
+#+END_HTML
