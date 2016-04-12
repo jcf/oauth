@@ -43,13 +43,13 @@
    :plaintext "PLAINTEXT"
    :rsa-sha1 "RSA-SHA1"})
 
-(def ^:private SignatureAlgo
+(def SignatureAlgo
   (apply s/enum (keys signature-algos)))
 
-(def ^:private SignatureMethod
+(def SignatureMethod
   (apply s/enum (vals signature-algos)))
 
-(def ^:private ConsumerConfig
+(def ConsumerConfig
   {:access-uri s/Str
    :authorize-uri s/Str
    :callback-uri s/Str
