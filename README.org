@@ -1,6 +1,5 @@
 #+TITLE: OAuth
 
-* Introduction
 *Note*: This project is under active development, and has yet to reach 1.0. As
 such the API may change.
 
