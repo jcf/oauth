@@ -103,6 +103,13 @@
           s/Str s/Str}))
 
 ;; -----------------------------------------------------------------------------
+;; Utils
+
+(defn- filter-vals
+  [m]
+  (into {} (filter val m)))
+
+;; -----------------------------------------------------------------------------
 ;; Consumer
 
 (defrecord Consumer
@@ -182,9 +189,8 @@
   (format "%s&%s&%s"
           (-> method name str/upper-case)
           (codec/url-encode uri)
-          (codec/url-encode (codec/form-encode params))))
+          (codec/url-encode (codec/form-encode (filter-vals params)))))
 
-;; FIXME Take form-params into account
 (s/defn signed-request :- SignedRequest
   [consumer :- Consumer oauth-request :- OAuthRequest]
   (let [{:keys [form-params request-method oauth-params url]} oauth-request
