@@ -1,13 +1,5 @@
 #+TITLE: OAuth
 
-[[https://dl.dropboxusercontent.com/u/508427/imgs/old-chain.jpg]]
-
-#+BEGIN_HTML
-<a href="https://circleci.com/gh/jcf/oauth">
-  <img src="https://circleci.com/gh/jcf/oauth.svg"></img>
-</a>
-#+END_HTML
-
 * Introduction
 *Note*: This project is under active development, and has yet to reach 1.0. As
 such the API may change.
