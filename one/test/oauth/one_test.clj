@@ -93,6 +93,20 @@
       "oauth_consumer_key" "key"
       "oauth_signature_method" "HMAC-SHA1")))
 
+(deftest t-request-token-request-with-callback-override
+  (let [consumer (make-consumer consumer-config)
+        request (request-token-request consumer {"oauth_callback" "http://localhost/override"})
+        auth (-> request
+                 (get-in [:headers "Authorization"])
+                 parse-auth-header)]
+    (is (nil? (s/check SignedRequest request)))
+    (is (= "http://example.com/token" (:url request)))
+    (is (nil? (s/check SignedOAuthAuthorization auth)))
+    (are [k v] (= (get auth k ::missing) v)
+      "oauth_callback" (codec/url-encode "http://localhost/override")
+      "oauth_consumer_key" "key"
+      "oauth_signature_method" "HMAC-SHA1")))
+
 ;; -----------------------------------------------------------------------------
 ;; Authorisation URL
 
@@ -106,7 +120,17 @@
              "oauth_callback" "http://localhost/oauth/callback"
              "oauth_token" "token"}]
            (split-url (authorization-url
-                       consumer {"oauth_token" "token" :a 1 :b 2}))))))
+                       consumer {"oauth_token" "token" :a 1 :b 2}))))
+    (is (= ["http://example.com/authorize"
+            {"a" "1" "b" "2"
+             "oauth_callback" "http://localhost/override"
+             "oauth_token" "token"}]
+           (-> consumer
+               (authorization-url {"oauth_token" "token"
+                                   "oauth_callback" "http://localhost/override"
+                                   :a 1
+                                   :b 2})
+               split-url)))))
 
 ;; -----------------------------------------------------------------------------
 ;; Access token request
