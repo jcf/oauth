@@ -14,8 +14,8 @@
 This project is under active development, and has yet to reach 1.0. As such the
 API may change.
 
-*OAuth 1.0* is implemented via [[https://github.com/jcf/oauth/tree/master/one][oauth/oauth.one]]. For more information on OAuth
+*OAuth 1.0* is implemented via [[https://github.com/jcf/oauth-one][oauth/oauth.one]]. For more information on OAuth
 1.0 you should consult [[https://tools.ietf.org/html/rfc5849][RFC 5849]].
 
-*OAuth 2.0* is implemented via [[https://github.com/jcf/oauth/tree/master/two][oauth/oauth.two]]. For more information on OAuth
+*OAuth 2.0* is implemented via [[https://github.com/jcf/oauth-two][oauth/oauth.two]]. For more information on OAuth
 1.0 you should consult [[https://tools.ietf.org/html/rfc6749][RFC 6749]].
