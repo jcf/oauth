@@ -8,8 +8,7 @@ two of the OAuth protocol.
 
 OAuth 1.0 is implemented in [[https://github.com/jcf/oauth-one][jcf/oauth-one]], and OAuth 2.0 is implemented in
 [[https://github.com/jcf/oauth-two][jcf/oauth-two]]. Both repositories contain a README with more information on
-installing them, and using them Both repositories contain a README with more
-information on installing and using them.
+installing them, and using them.
 
 #+BEGIN_HTML
 <table>
